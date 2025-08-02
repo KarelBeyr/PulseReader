@@ -34,7 +34,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
+#define UART_BUFFER_SIZE 16
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -50,6 +50,11 @@ UART_HandleTypeDef huart2;
 /* USER CODE BEGIN PV */
 volatile uint32_t last_rising = 0, rising = 0, falling = 0;
 volatile uint8_t new_data_available = 0;
+
+volatile char uart_buffer[UART_BUFFER_SIZE];
+volatile uint8_t uart_index = 0;
+volatile bool uart_number_ready = false;
+uint8_t uart_rx_byte;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -60,6 +65,7 @@ static void MX_TIM2_Init(void);
 /* USER CODE BEGIN PFP */
 static void RenderPwmUart(uint16_t duty, uint32_t freq);
 static void UartSetCursorPosition(int row, int col);
+static int ReadUARTNumber(void);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -111,9 +117,20 @@ int main(void)
   int lastDuty = -10;
   bool signalAcquired = false;
   uint32_t lastPulse = 0;
+  uart_rx_byte = 0;
+  HAL_UART_Receive_IT(&huart2, &uart_rx_byte, 1);
   while (1)
   {
     uint32_t now = HAL_GetTick();
+
+    int num = ReadUARTNumber();
+    if (num >= 0)
+    {
+      char msg[32];
+      sprintf(msg, "Got number: %d\r\n", num);
+      printf(msg);
+    }
+
     if (new_data_available)
     {
       new_data_available = 0;
@@ -439,6 +456,38 @@ int __io_putchar(int ch)
     return -1;
   }
   return ch;
+}
+
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+{
+  if (huart->Instance == USART2)
+  {
+    if (uart_rx_byte == '\r')
+    {  // End of input (Enter key)
+      uart_buffer[uart_index] = '\0';  // Null-terminate string
+      uart_number_ready = true;
+      uart_index = 0;
+    } else if (uart_index < UART_BUFFER_SIZE - 1)
+    {
+      if (uart_rx_byte >= '0' && uart_rx_byte <= '9')
+      {
+        uart_buffer[uart_index++] = uart_rx_byte;
+      }
+    }
+
+    // Continue receiving next character
+    HAL_UART_Receive_IT(&huart2, &uart_rx_byte, 1);
+  }
+}
+
+int ReadUARTNumber(void)
+{
+  if (uart_number_ready)
+  {
+    uart_number_ready = false;
+    return atoi((char*) uart_buffer);  // Simple ASCII to int
+  }
+  return -1;  // Indicate no new number yet
 }
 
 // I don't know how to set this up in .IOC editor, so I hardcode it here. We cannot regenerate code now :-/
