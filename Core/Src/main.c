@@ -100,75 +100,80 @@ int main(void)
   SystemClock_Config();
 
   /* USER CODE BEGIN SysInit */
-
+  __HAL_RCC_GPIOA_CLK_ENABLE();
+  __HAL_RCC_DAC_CLK_ENABLE();
   /* USER CODE END SysInit */
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
-  MX_USART2_UART_Init();
-  MX_TIM2_Init();
+//  MX_USART2_UART_Init();
+//  MX_TIM2_Init();
   MX_DAC_Init();
   /* USER CODE BEGIN 2 */
   // Start Input Capture for CH1 (rising edge)
-  HAL_TIM_IC_Start_IT(&htim2, TIM_CHANNEL_1);
-  // Start Input Capture for CH2 (falling edge)
-  HAL_TIM_IC_Start_IT(&htim2, TIM_CHANNEL_2);
+//  HAL_TIM_IC_Start_IT(&htim2, TIM_CHANNEL_1);
+//  // Start Input Capture for CH2 (falling edge)
+//  HAL_TIM_IC_Start_IT(&htim2, TIM_CHANNEL_2);
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-  setbuf(stdout, NULL); // so that we do not need to add \r\n at the end of printf statements
-  int lastDuty = -10;
-  bool signalAcquired = false;
-  uint32_t lastPulse = 0;
-  uart_rx_byte = 0;
-  HAL_UART_Receive_IT(&huart2, &uart_rx_byte, 1);
+//  setbuf(stdout, NULL); // so that we do not need to add \r\n at the end of printf statements
+//  int lastDuty = -10;
+//  bool signalAcquired = false;
+//  uint32_t lastPulse = 0;
+//  uart_rx_byte = 0;
+//  HAL_UART_Receive_IT(&huart2, &uart_rx_byte, 1);
   HAL_DAC_Start(&hdac, DAC_CHANNEL_1);  // Start DAC on Channel 1 (PA4)
   HAL_DAC_SetValue(&hdac, DAC_CHANNEL_1, DAC_ALIGN_12B_R, 2048);
+  int i = 0;
   while (1)
   {
-    HAL_DAC_SetValue(&hdac, DAC_CHANNEL_1, DAC_ALIGN_12B_R, 2048);
-    uint32_t now = HAL_GetTick();
-
-    int num = ReadUARTNumber();
-    if (num >= 0)
-    {
-      char msg[32];
-      sprintf(msg, "Got number: %d\r\n", num);
-      printf(msg);
-    }
-
-    if (new_data_available)
-    {
-      new_data_available = 0;
-      lastPulse = now;
-      signalAcquired = true;
-      uint32_t period = rising - last_rising;
-      uint32_t high_time = falling - last_rising;
-      uint32_t freq = 0;
-      uint16_t duty = 0;
-
-      if (period > 0)
-      {
-        freq = HAL_RCC_GetPCLK1Freq() * 2 / period;
-        duty = (high_time * 100) / period;
-        if (duty > 100)
-          duty = duty - 100;
-        if (duty > 100)
-          continue;
-      }
-      if (freq < 1000)
-        duty = 0;
-      if (abs(lastDuty - duty) > 1)
-      {
-        RenderPwmUart(duty, freq);
-        lastDuty = duty;
-      }
-    } else if (signalAcquired && now - lastPulse > 1000)
-    {
-      signalAcquired = false;
-      RenderPwmUart(0, 0);
-    }
+    i++;
+    HAL_DAC_SetValue(&hdac, DAC_CHANNEL_1, DAC_ALIGN_12B_R, i);
+    HAL_Delay(2);
+    if (i > 4096) i = 0;
+//    uint32_t now = HAL_GetTick();
+//
+//    int num = ReadUARTNumber();
+//    if (num >= 0)
+//    {
+//      char msg[32];
+//      sprintf(msg, "Got number: %d\r\n", num);
+//      printf(msg);
+//    }
+//
+//    if (new_data_available)
+//    {
+//      new_data_available = 0;
+//      lastPulse = now;
+//      signalAcquired = true;
+//      uint32_t period = rising - last_rising;
+//      uint32_t high_time = falling - last_rising;
+//      uint32_t freq = 0;
+//      uint16_t duty = 0;
+//
+//      if (period > 0)
+//      {
+//        freq = HAL_RCC_GetPCLK1Freq() * 2 / period;
+//        duty = (high_time * 100) / period;
+//        if (duty > 100)
+//          duty = duty - 100;
+//        if (duty > 100)
+//          continue;
+//      }
+//      if (freq < 1000)
+//        duty = 0;
+//      if (abs(lastDuty - duty) > 1)
+//      {
+//        RenderPwmUart(duty, freq);
+//        lastDuty = duty;
+//      }
+//    } else if (signalAcquired && now - lastPulse > 1000)
+//    {
+//      signalAcquired = false;
+//      RenderPwmUart(0, 0);
+//    }
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -230,37 +235,18 @@ void SystemClock_Config(void)
  */
 static void MX_DAC_Init(void)
 {
+  DAC_ChannelConfTypeDef sConfig = {0};
 
-  /* USER CODE BEGIN DAC_Init 0 */
-
-  /* USER CODE END DAC_Init 0 */
-
-  DAC_ChannelConfTypeDef sConfig = { 0 };
-
-  /* USER CODE BEGIN DAC_Init 1 */
-
-  /* USER CODE END DAC_Init 1 */
-
-  /** DAC Initialization
-   */
   hdac.Instance = DAC;
-  if (HAL_DAC_Init(&hdac) != HAL_OK)
-  {
+  if (HAL_DAC_Init(&hdac) != HAL_OK) {
     Error_Handler();
   }
 
-  /** DAC channel OUT1 config
-   */
   sConfig.DAC_Trigger = DAC_TRIGGER_NONE;
   sConfig.DAC_OutputBuffer = DAC_OUTPUTBUFFER_ENABLE;
-  if (HAL_DAC_ConfigChannel(&hdac, &sConfig, DAC_CHANNEL_1) != HAL_OK)
-  {
+  if (HAL_DAC_ConfigChannel(&hdac, &sConfig, DAC_CHANNEL_1) != HAL_OK) {
     Error_Handler();
   }
-  /* USER CODE BEGIN DAC_Init 2 */
-
-  /* USER CODE END DAC_Init 2 */
-
 }
 
 /**
